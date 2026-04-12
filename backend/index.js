@@ -9,7 +9,8 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-const upload = multer({ dest: 'uploads/' });
+// Use memoryStorage instead of writing to disk (Serverless compatibility)
+const upload = multer({ storage: multer.memoryStorage() });
 
 app.get('/api/data', (req, res) => {
   try {
@@ -23,7 +24,6 @@ app.get('/api/data', (req, res) => {
         res.json(result.data);
       }
     });
-
   } catch (error) {
     console.error("Error reading initial data:", error);
     res.status(500).json({ error: "Failed to load underlying data" });
@@ -36,19 +36,22 @@ app.post('/api/upload', upload.single('csvFile'), (req, res) => {
     return res.status(400).json({ error: 'No file uploaded' });
   }
   
-  const content = fs.readFileSync(req.file.path, 'utf8');
+  const content = req.file.buffer.toString('utf8');
   Papa.parse(content, {
     header: true,
     skipEmptyLines: true,
     complete: (result) => {
-      // Clean up the uploaded file
-      fs.unlinkSync(req.file.path);
       res.json(result.data);
     }
   });
 });
 
-const PORT = 5000;
-app.listen(PORT, () => {
-  console.log(`Backend server running on http://localhost:${PORT}`);
-});
+// Needed for Vercel serverless to export the app hook, while still allowing local dev!
+if (process.env.NODE_ENV !== 'production') {
+  const PORT = process.env.PORT || 5000;
+  app.listen(PORT, () => {
+    console.log(`Backend server running on http://localhost:${PORT}`);
+  });
+}
+
+module.exports = app;
