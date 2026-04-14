@@ -9,7 +9,7 @@ import {
 } from 'chart.js';
 import { Bar, Line, Doughnut, Pie, Scatter, Radar, PolarArea } from 'react-chartjs-2';
 import { detectColumns, cleanData, countBy, topN, alpha, PALETTE, uniqueSorted, fmt, createBins } from './utils';
-import { Download, Plus, Trash2, Search, LayoutDashboard, FileSpreadsheet, Zap, ChevronRight, Check } from 'lucide-react';
+import { Download, Plus, Trash2, Search, LayoutDashboard, FileSpreadsheet, Zap, ChevronRight, Check, Filter } from 'lucide-react';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend, ArcElement, Filler, RadialLinearScale);
 ChartJS.defaults.font.family = "'Outfit', sans-serif";
@@ -56,7 +56,23 @@ const COLOR_THEMES = [
 
 // ─── Main App ───
 export default function App() {
-  const [data, setData] = useState([]);
+  const [originalData, setOriginalData] = useState([]);
+  const [globalFilters, setGlobalFilters] = useState({});
+  const [filterCol, setFilterCol] = useState('');
+
+  const data = React.useMemo(() => {
+    if (!originalData.length) return [];
+    if (Object.keys(globalFilters).length === 0) return originalData;
+    
+    return originalData.filter(row => {
+      for (let col in globalFilters) {
+        if (globalFilters[col].length > 0 && !globalFilters[col].includes(String(row[col]))) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [originalData, globalFilters]);
   const [rawCount, setRawCount] = useState(0);
   const [columns, setColumns] = useState([]);
   const [numericCols, setNumericCols] = useState([]);
@@ -119,7 +135,8 @@ export default function App() {
     const map = detectColumns(hdrs);
     setColMap(map);
     const cleaned = cleanData(raw, map);
-    setData(cleaned);
+    setOriginalData(cleaned);
+    setGlobalFilters({});
 
     const nums = hdrs.filter(h => {
       const sample = cleaned.slice(0, 20);
@@ -349,6 +366,60 @@ export default function App() {
                     {columns.filter(c => c !== xAxis && c !== yAxis).map(c => <option key={c}>{c}</option>)}
                   </select>
                 </div>
+              </div>
+
+              {/* Global Filters */}
+              <div className="section">
+                <div className="section-title"><Filter size={16} style={{display:'inline', verticalAlign:'text-bottom', marginRight:6}} /> Global Filters</div>
+                
+                {Object.keys(globalFilters).map(col => (
+                  <div key={col} className="form-group" style={{ marginBottom: 12 }}>
+                    <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      {col}
+                      <span style={{ cursor: 'pointer', color: '#ef4444' }} onClick={() => {
+                        const newF = {...globalFilters};
+                        delete newF[col];
+                        setGlobalFilters(newF);
+                        if(filterCol === col) setFilterCol('');
+                      }}>Clear</span>
+                    </label>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
+                      {globalFilters[col].map(v => (
+                        <span key={v} onClick={() => {
+                           const newF = {...globalFilters};
+                           newF[col] = newF[col].filter(val => val !== v);
+                           if(newF[col].length === 0) delete newF[col];
+                           setGlobalFilters(newF);
+                        }} style={{ padding: '2px 8px', background: 'rgba(59,130,246,0.1)', border: '1px solid currentColor', color: '#60a5fa', borderRadius: 12, fontSize: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+                          {v} ✕
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+                
+                <div className="form-group">
+                  <select className="form-select" value={filterCol} onChange={e => setFilterCol(e.target.value)}>
+                    <option value="">+ Add Filter</option>
+                    {catCols.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                
+                {filterCol && (
+                   <div className="form-group" style={{ marginTop: 8 }}>
+                     <select className="form-select" value="" onChange={e => {
+                        const v = e.target.value;
+                        if(v) setGlobalFilters(p => ({...p, [filterCol]: [...(p[filterCol]||[]), v]}));
+                     }}>
+                       <option value="">Select Value...</option>
+                       {uniqueSorted(originalData, filterCol)
+                          .filter(v => !(globalFilters[filterCol] || []).includes(String(v)))
+                          .map(v => (
+                            <option key={v} value={v}>{String(v)}</option>
+                          ))}
+                     </select>
+                   </div>
+                )}
               </div>
 
               {/* Chart Types — Collapsible Categories */}
