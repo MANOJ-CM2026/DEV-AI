@@ -349,5 +349,5 @@ Distributed under the MIT License. See `LICENSE` for more information.
 
 ---
 <div align="center">
-  <sub>Built with ❤️ by DEV.x Team</sub>
+  <sub>Made with ❤️ by Manoj-A-2005</sub>
 </div>
